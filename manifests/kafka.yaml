@@ -3,6 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kafka-hs
+  namespace: kafka
   labels:
     app: kafka
 spec:
@@ -17,6 +18,7 @@ apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
   name: kafka-pdb
+  namespace: kafka
 spec:
   selector:
     matchLabels:
@@ -27,9 +29,10 @@ apiVersion: apps/v1beta1
 kind: StatefulSet
 metadata:
   name: kafka
+  namespace: kafka
 spec:
   serviceName: kafka-hs
-  replicas: 5
+  replicas: 1
   podManagementPolicy: Parallel
   updateStrategy:
       type: RollingUpdate
@@ -63,11 +66,11 @@ spec:
       containers:
       - name: k8skafka
         imagePullPolicy: Always
-        image: gcr.io/google_containers/kubernetes-kafka:1.0-10.2.1
+        image: docker.geexfinance.com/kafka/kafka:latest
         resources:
           requests:
-            memory: "12Gi"
-            cpu: 4
+            memory: "1Gi"
+            cpu: 1
         ports:
         - containerPort: 9093
           name: server
@@ -76,7 +79,7 @@ spec:
         - -c
         - "exec kafka-server-start.sh /opt/kafka/config/server.properties --override broker.id=${HOSTNAME##*-} \
           --override listeners=PLAINTEXT://:9093 \
-          --override zookeeper.connect=zk-cs.default.svc.cluster.local:2181 \
+          --override zookeeper.connect=zk0.alpha.com:2181 \
           --override log.dir=/var/lib/kafka \
           --override auto.create.topics.enable=true \
           --override auto.leader.rebalance.enable=true \
@@ -163,7 +166,7 @@ spec:
           --override reserved.broker.max.id=1000 "
         env:
         - name: KAFKA_HEAP_OPTS
-          value : "-Xmx2G -Xms2G"
+          value : "-Xmx1G -Xms1G"
         - name: KAFKA_OPTS
           value: "-Dlogging.level=INFO"
         volumeMounts:
@@ -178,11 +181,17 @@ spec:
       securityContext:
         runAsUser: 1000
         fsGroup: 1000
-  volumeClaimTemplates:
-  - metadata:
-      name: datadir
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 10Gi
+      imagePullSecrets:
+        - name: geexregistrykey
+      volumes:
+      - name: datadir
+        hostPath:
+          path: /var/lib/kafka
+#  volumeClaimTemplates:
+#  - metadata:
+#      name: datadir
+#    spec:
+#      accessModes: [ "ReadWriteOnce" ]
+#      resources:
+#        requests:
+#          storage: 10Gi
